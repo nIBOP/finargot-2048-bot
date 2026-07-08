@@ -18,6 +18,8 @@ echo Важно:
 echo   - Не закрывайте Chrome во время игры.
 echo   - Не нажимайте стрелки вручную.
 echo   - После конца игры дождитесь сохранения результата на сайте.
+echo   - Включен safe-finish: после ~520k или 18500 ходов бот сам закончит партию,
+echo     чтобы не получить BAD_MOVES за превышение лимита ходов.
 echo.
 
 if not exist "bot_final.py" (
@@ -67,6 +69,8 @@ echo.
   --rest-every 300 ^
   --rest-delay 4 10 ^
   --after-move-timeout 1.2 ^
+  --force-loss-after-score 520000 ^
+  --force-loss-after-moves 18500 ^
   --log-dir runs\battle_tdl_8x6_3p_slow ^
   --post-game-hold 900 ^
   --error-hold 300

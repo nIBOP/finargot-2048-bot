@@ -373,6 +373,55 @@ def evaluate_board(board: Board, config: SolverConfig = SolverConfig()) -> float
     )
 
 
+def force_loss_board_score(board: Board, config: SolverConfig = SolverConfig()) -> float:
+    moves = valid_moves(board)
+    if not moves:
+        return -1_000_000_000.0
+
+    max_tile = max(board_max_tile(board), 2)
+    return (
+        board_empty_count(board) * 2200.0
+        + len(moves) * 1800.0
+        + count_merge_potential(board) * 900.0
+        + monotonicity_score(board) * 25.0
+        + smoothness_score(board) * 8.0
+        + corner_score(board, config.corner) * 30.0
+        + tile_log(max_tile) * 25.0
+    )
+
+
+def expected_force_loss_score(board: Board, config: SolverConfig = SolverConfig()) -> float:
+    cells = empty_cells(board)
+    if not cells:
+        return force_loss_board_score(board, config)
+
+    total = 0.0
+    for row, col in cells:
+        total += 0.9 * force_loss_board_score(set_cell(board, row, col, 2), config)
+        total += 0.1 * force_loss_board_score(set_cell(board, row, col, 4), config)
+    return total / len(cells)
+
+
+def choose_force_loss_move(board: Board, config: SolverConfig = SolverConfig()) -> Decision:
+    moves = valid_moves(board)
+    if not moves:
+        return Decision(None, -1_000_000_000.0, 0, (), 0.0)
+
+    start = time.perf_counter()
+    scored: list[tuple[float, Direction]] = []
+    for move in moves:
+        moved_board, gain, _ = simulate_move(board, move)
+        value = expected_force_loss_score(moved_board, config) + gain * 0.35
+        scored.append((value, move))
+
+    scored.sort(key=lambda item: item[0])
+    best_value = scored[0][0]
+    near_worst = [move for value, move in scored if value <= best_value + 450.0]
+    move = random.choice(near_worst)
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    return Decision(move, best_value, 0, moves, elapsed_ms)
+
+
 ROW_MASK = 0xFFFF
 COL_MASK = 0x000F000F000F000F
 MASK64 = 0xFFFFFFFFFFFFFFFF
@@ -1575,6 +1624,7 @@ def run_bot(args: argparse.Namespace) -> int:
     estimated_score = 0
     last_board: Board | None = None
     last_decision: Decision | None = None
+    force_loss_active = False
     try:
         bot.open_game()
 
@@ -1586,7 +1636,16 @@ def run_bot(args: argparse.Namespace) -> int:
                 continue
 
             turn_config = million_mode_config(board, config)
-            if tdl_solver_client:
+            should_force_loss = (
+                (args.force_loss_after_moves > 0 and move_number >= args.force_loss_after_moves)
+                or (args.force_loss_after_score > 0 and estimated_score >= args.force_loss_after_score)
+            )
+            if should_force_loss:
+                if not force_loss_active:
+                    force_loss_active = True
+                    print("[bot] Force-loss mode enabled: finishing before the server move limit.")
+                decision = choose_force_loss_move(board, turn_config)
+            elif tdl_solver_client:
                 decision = tdl_solver_client.choose_best_move(board, turn_config)
             elif rust_solver_client:
                 decision = rust_solver_client.choose_best_move(board, turn_config)
@@ -1664,6 +1723,7 @@ def run_bot(args: argparse.Namespace) -> int:
                 f"счет~={estimated_score} прирост={predicted_gain} "
                 f"depth={decision.depth}/{turn_config.depth} budget={turn_config.time_limit_ms}ms "
                 f"пауза={delay:.2f}s value={decision.value:.2f}"
+                f"{' force_loss=1' if force_loss_active else ''}"
             )
             time.sleep(delay)
             if args.rest_every > 0 and move_number % args.rest_every == 0:
@@ -1738,6 +1798,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rest-delay", type=float, nargs=2, default=(4.0, 10.0), metavar=("MIN", "MAX"))
     parser.add_argument("--after-move-timeout", type=float, default=1.2)
     parser.add_argument("--max-moves", type=int, default=0, help="0 means unlimited.")
+    parser.add_argument("--force-loss-after-moves", type=int, default=0, help="Switch to intentionally bad legal moves after N moves; 0 disables it.")
+    parser.add_argument("--force-loss-after-score", type=int, default=0, help="Switch to intentionally bad legal moves after estimated score reaches N; 0 disables it.")
     parser.add_argument("--post-game-hold", type=int, default=900, help="Seconds to keep the browser alive after game over/max moves.")
     parser.add_argument("--error-hold", type=int, default=300, help="Seconds to keep the browser alive after a fatal error.")
     parser.add_argument("--log-dir", default="runs")
