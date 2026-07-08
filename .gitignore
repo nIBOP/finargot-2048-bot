@@ -1,0 +1,32 @@
+# Runtime state and private browser data
+runs/
+dist/
+
+# Build outputs
+target/
+*.class
+*.exe
+*.dll
+*.pdb
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local tool/config folders
+.agents/
+.codex/
+.cargo/
+
+# Vendored external solvers and large model files
+external/2048-ai/
+external/TDL2048/
+*.w
+*.w.xz
+*.xz
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
