@@ -1,9 +1,9 @@
 # Восстановление окружения и обучение модели
 
-Этот репозиторий содержит код бота, Rust/Java/Python fallback-решатели, патч для
-TDL2048 и скрипты восстановления. В git намеренно нет `runs/`, `dist/`,
-`external/TDL2048/`, `.exe` и больших `.w` моделей: там приватный Chrome-профиль,
-логи и файлы на сотни мегабайт.
+Этот репозиторий содержит финальный Python-бот, патч для TDL2048 и скрипты
+восстановления/обучения. В git намеренно нет `runs/`, `external/TDL2048/`,
+`.exe` и больших `.w` моделей: там приватный Chrome-профиль, логи и файлы на
+сотни мегабайт.
 
 ## Быстрый рабочий путь
 
@@ -112,9 +112,8 @@ python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search 3
 ## Проверки после восстановления
 
 ```powershell
-python -m py_compile main.py bot_final.py simulate_local.py
-python -m unittest discover -s tests -v
-cargo build --release
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1 -SkipModel -SkipBuild
+python -m py_compile main.py bot_final.py
 ```
 
 Проверить, что TDL-файлы на месте:
@@ -138,4 +137,3 @@ Test-Path external\TDL2048\8x6patt.w
 
 Последние два параметра нужны, чтобы не получить `BAD_MOVES`: сайт отклоняет
 слишком длинные партии по лимиту ходов.
-

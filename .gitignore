@@ -2,9 +2,7 @@
 runs/
 dist/
 
-# Build outputs
-target/
-*.class
+# Build outputs and generated binaries
 *.exe
 *.dll
 *.pdb
@@ -16,10 +14,8 @@ __pycache__/
 # Local tool/config folders
 .agents/
 .codex/
-.cargo/
 
-# Vendored external solvers and large model files
-external/2048-ai/
+# Vendored external solver and large model files
 external/TDL2048/
 *.w
 *.w.xz
@@ -29,4 +25,3 @@ external/TDL2048/
 *.log
 *.tmp
 *.bak
-

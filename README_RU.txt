@@ -63,12 +63,3 @@ FINARGOT 2048 BOT
 
 Чтобы сделать тестовое обучение модели:
   powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 10
-
-Сборка
-------
-Для сборки переносимой папки запустите:
-  powershell -ExecutionPolicy Bypass -File .\build.ps1
-
-Результат появится в:
-  dist\finargot-bot
-  dist\finargot-bot.zip

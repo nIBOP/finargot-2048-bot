@@ -9,8 +9,8 @@ external/TDL2048/tdl2048.exe
 external/TDL2048/8x6patt.w
 ```
 
-The bot also has Rust, Java and Python fallback solvers, but the TDL backend is
-the preferred contest configuration used by `START_BOT_SLOW.bat`.
+The public contest build uses TDL2048 for the strongest moves. The Python
+solver inside `bot_final.py` is kept only as a local fallback/smoke-check path.
 
 To recreate this folder from scratch on Windows:
 

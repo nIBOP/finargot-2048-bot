@@ -6,9 +6,7 @@ Automation bot for the BattlePass 2048 mini-game. The current main entrypoint is
 ## What Is Included
 
 - Python Selenium bot with friendly Russian console prompts.
-- Rust fallback solver in `src/main.rs`.
-- Java fallback solver source in `Solver2048.java`.
-- Local simulator and tests.
+- Built-in Python fallback solver for smoke checks.
 - `START_BOT_SLOW.bat` for a safer slow launch that reduces `TOO_FAST` risk.
 - `patches/tdl2048-protocol.patch`, required to make upstream TDL2048 work as
   an interactive solver for this bot.
@@ -21,10 +19,8 @@ Automation bot for the BattlePass 2048 mini-game. The current main entrypoint is
 The repository intentionally does not include runtime/private/heavy files:
 
 - `runs/` with Chrome profile, cookies, logs, screenshots and diagnostics.
-- `dist/` release package.
-- `target/` build outputs.
 - `external/TDL2048/` and model files such as `8x6patt.w`.
-- `.exe`, `.class` and other generated binaries.
+- `.exe` and other generated binaries.
 
 GitHub rejects files above 100 MB, and the TDL model is much larger than that.
 Keep those files local or share them as a separate archive/release asset.
@@ -112,17 +108,6 @@ More details in [docs/RESTORE_AND_TRAIN_RU.md](docs/RESTORE_AND_TRAIN_RU.md).
 ## Development Checks
 
 ```powershell
-python -m py_compile main.py bot_final.py simulate_local.py
-python -m unittest discover -s tests -v
-cargo build --release
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1 -SkipModel -SkipBuild
+python -m py_compile main.py bot_final.py
 ```
-
-## Package Build
-
-If the external TDL files are present locally, build the portable folder and zip:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\build.ps1
-```
-
-The result is written to `dist/finargot-bot` and `dist/finargot-bot.zip`.

@@ -967,138 +967,6 @@ def choose_best_move(board: Board, config: SolverConfig = SolverConfig()) -> Dec
     return choose_best_move_legacy(board, config)
 
 
-class JavaSolverClient:
-    def __init__(self, classpath: Path | str = ".") -> None:
-        self.process = subprocess.Popen(
-            ["java", "-cp", str(classpath), "Solver2048"],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-        if self.process.stdin is None or self.process.stdout is None:
-            raise RuntimeError("Failed to open Java solver pipes")
-        banner = self.process.stdout.readline().strip()
-        if banner != "READY":
-            self.close()
-            raise RuntimeError(f"Java solver did not become ready: {banner!r}")
-
-    def choose_best_move(self, board: Board, config: SolverConfig) -> Decision:
-        if self.process.stdin is None or self.process.stdout is None:
-            raise RuntimeError("Java solver process is closed")
-
-        packed = board_to_bitboard(board)
-        started = time.perf_counter()
-        self.process.stdin.write(
-            f"SOLVE {packed:016x} {config.depth} {config.time_limit_ms} {config.cprob_threshold}\n"
-        )
-        self.process.stdin.flush()
-
-        line = self.process.stdout.readline().strip()
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
-        if not line:
-            raise RuntimeError("Java solver returned no response")
-        parts = line.split()
-        if parts[0] != "OK" or len(parts) < 6:
-            raise RuntimeError(f"Java solver error: {line}")
-
-        move = None if parts[1] == "NONE" else parts[1]
-        if move is not None and move not in DIRECTIONS:
-            raise RuntimeError(f"Java solver returned invalid move: {move}")
-
-        return Decision(
-            move,  # type: ignore[arg-type]
-            float(parts[3]),
-            int(parts[2]),
-            valid_moves(board),
-            float(parts[4]) if parts[4] else elapsed_ms,
-        )
-
-    def close(self) -> None:
-        try:
-            if self.process.stdin is not None:
-                self.process.stdin.write("QUIT\n")
-                self.process.stdin.flush()
-        except Exception:
-            pass
-        try:
-            self.process.wait(timeout=2)
-        except Exception:
-            self.process.kill()
-
-
-class RustSolverClient:
-    def __init__(self, executable: Path | str = Path("target") / "release" / "solver2048.exe") -> None:
-        exe_path = Path(executable)
-        if not exe_path.exists():
-            raise RuntimeError(f"Rust solver executable not found: {exe_path}")
-
-        env = os.environ.copy()
-        rust_bin = Path("C:/Program Files/Rust stable LLVM 1.96/bin")
-        if rust_bin.exists():
-            env["PATH"] = str(rust_bin) + os.pathsep + env.get("PATH", "")
-
-        self.process = subprocess.Popen(
-            [str(exe_path)],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-            env=env,
-        )
-        if self.process.stdin is None or self.process.stdout is None:
-            raise RuntimeError("Failed to open Rust solver pipes")
-        banner = self.process.stdout.readline().strip()
-        if banner != "READY":
-            self.close()
-            raise RuntimeError(f"Rust solver did not become ready: {banner!r}")
-
-    def choose_best_move(self, board: Board, config: SolverConfig) -> Decision:
-        if self.process.stdin is None or self.process.stdout is None:
-            raise RuntimeError("Rust solver process is closed")
-
-        packed = board_to_bitboard(board)
-        started = time.perf_counter()
-        self.process.stdin.write(
-            f"SOLVE {packed:016x} {config.depth} {config.time_limit_ms} {config.cprob_threshold}\n"
-        )
-        self.process.stdin.flush()
-
-        line = self.process.stdout.readline().strip()
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
-        if not line:
-            raise RuntimeError("Rust solver returned no response")
-        parts = line.split()
-        if parts[0] != "OK" or len(parts) < 6:
-            raise RuntimeError(f"Rust solver error: {line}")
-
-        move = None if parts[1] == "NONE" else parts[1]
-        if move is not None and move not in DIRECTIONS:
-            raise RuntimeError(f"Rust solver returned invalid move: {move}")
-
-        return Decision(
-            move,  # type: ignore[arg-type]
-            float(parts[3]),
-            int(parts[2]),
-            valid_moves(board),
-            float(parts[4]) if parts[4] else elapsed_ms,
-        )
-
-    def close(self) -> None:
-        try:
-            if self.process.stdin is not None:
-                self.process.stdin.write("QUIT\n")
-                self.process.stdin.flush()
-        except Exception:
-            pass
-        try:
-            self.process.wait(timeout=2)
-        except Exception:
-            self.process.kill()
-
-
 class TDLSolverClient:
     def __init__(
         self,
@@ -1580,12 +1448,8 @@ def run_bot(args: argparse.Namespace) -> int:
     delay_min, delay_max = args.delay
     log_path = Path(args.log_dir) / f"run-{int(time.time())}.jsonl" if args.log_dir else None
     base_dir = Path(__file__).resolve().parent
-    rust_exe = base_dir / "target" / "release" / "solver2048.exe"
-    java_class = base_dir / "Solver2048.class"
     tdl_exe = base_dir / "external" / "TDL2048" / "tdl2048.exe"
     tdl_network, tdl_model = resolve_tdl_model(base_dir, args.tdl_network)
-    solver_client: JavaSolverClient | None = None
-    rust_solver_client: RustSolverClient | None = None
     tdl_solver_client: TDLSolverClient | None = None
     solver_label = "Python"
 
@@ -1596,20 +1460,6 @@ def run_bot(args: argparse.Namespace) -> int:
         print("[bot] Решатель TDL2048 готов.")
     elif args.solver_backend == "tdl":
         raise RuntimeError("TDL2048 solver/model not found. Build external/TDL2048/tdl2048.exe and download 4x6patt.w.")
-    elif args.solver_backend in ("auto", "rust") and rust_exe.exists():
-        solver_label = "Rust bitboard"
-        print("[bot] Запускаю Rust bitboard решатель...")
-        rust_solver_client = RustSolverClient(rust_exe)
-        print("[bot] Rust решатель готов.")
-    elif args.solver_backend == "rust":
-        raise RuntimeError("Rust solver executable not found. Build it with: cargo build --release")
-    elif args.solver_backend in ("auto", "java") and java_class.exists():
-        solver_label = "Java bitboard"
-        print("[bot] Запускаю Java bitboard решатель...")
-        solver_client = JavaSolverClient(base_dir)
-        print("[bot] Java решатель готов.")
-    elif args.solver_backend == "java":
-        raise RuntimeError("Solver2048.class not found. Compile it with: javac Solver2048.java")
     else:
         print("[bot] Грею таблицы Python-решателя...")
         warmup_start = time.perf_counter()
@@ -1647,10 +1497,6 @@ def run_bot(args: argparse.Namespace) -> int:
                 decision = choose_force_loss_move(board, turn_config)
             elif tdl_solver_client:
                 decision = tdl_solver_client.choose_best_move(board, turn_config)
-            elif rust_solver_client:
-                decision = rust_solver_client.choose_best_move(board, turn_config)
-            elif solver_client:
-                decision = solver_client.choose_best_move(board, turn_config)
             else:
                 decision = choose_best_move(board, turn_config)
             last_board = board
@@ -1763,10 +1609,6 @@ def run_bot(args: argparse.Namespace) -> int:
             print(f"[bot] Не удалось сохранить диагностику: {snapshot_exc!r}")
         raise
     finally:
-        if solver_client is not None:
-            solver_client.close()
-        if rust_solver_client is not None:
-            rust_solver_client.close()
         if tdl_solver_client is not None:
             tdl_solver_client.close()
         if args.close_browser:
@@ -1782,7 +1624,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--depth", type=int, default=16, help="Expectimax depth in player moves.")
     parser.add_argument("--time-limit-ms", type=int, default=140, help="Soft time budget per decision.")
     parser.add_argument("--legacy-solver", action="store_true", help="Use the old tuple-board solver instead of the fast bitboard solver.")
-    parser.add_argument("--solver-backend", choices=("auto", "python", "java", "rust", "tdl"), default="auto")
+    parser.add_argument("--solver-backend", choices=("auto", "python", "tdl"), default="auto")
     parser.add_argument("--tdl-network", default="auto", help="TDL2048 network: auto, 4x6patt, 5x6patt, 6x6patt, 7x6patt, 8x6patt.")
     parser.add_argument("--tdl-search", default="3p", help="TDL2048 expectimax search setting, for example 1p, 2p, 3p.")
     parser.add_argument("--fixed-depth", action="store_true", help="Use --depth exactly instead of adaptive distinct-tile depth.")
