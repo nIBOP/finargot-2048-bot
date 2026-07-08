@@ -54,6 +54,16 @@ FINARGOT 2048 BOT
 - Python 3.10 или новее.
 - Интернет при первом запуске, чтобы поставить selenium/webdriver-manager и скачать ChromeDriver.
 
+Восстановление TDL и обучение модели
+------------------------------------
+Полная инструкция лежит в docs\RESTORE_AND_TRAIN_RU.md.
+
+Коротко: чтобы восстановить внешний TDL-решатель, модель и сборку, запустите:
+  powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
+
+Чтобы сделать тестовое обучение модели:
+  powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 10
+
 Сборка
 ------
 Для сборки переносимой папки запустите:

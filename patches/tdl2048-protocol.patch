@@ -1,0 +1,91 @@
+diff --git a/2048.cpp b/2048.cpp
+index 7dcee58..24acddf 100644
+--- a/2048.cpp
++++ b/2048.cpp
+@@ -2545,6 +2545,9 @@ utils::options parse(int argc, const char* argv[]) {
+ 		case to_hash("-c"): case to_hash("--cache"):
+ 			opts["cache"] = next_opts("2048M");
+ 			break;
++		case to_hash("--protocol"):
++			opts["protocol"] = "1";
++			break;
+ 		case to_hash("-p"): case to_hash("--parallel"): case to_hash("--thread"):
+ 			opts["thread"] = std::thread::hardware_concurrency();
+ 			if ((opts[""] = next_opts()).value(0)) opts["thread"].clear();
+@@ -2573,7 +2576,7 @@ utils::options parse(int argc, const char* argv[]) {
+ 		}
+ 	}
+ 
+-	if (!opts("recipes")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
++	if (!opts("recipes") && !opts("protocol")) opts["recipes"] = "optimize", opts["optimize"] = 1000;
+ 	if (!opts("seed")) opts["seed"] = format("%08" PRIx32, math::fmix32(microsec()));
+ 
+ 	for (std::string recipe : opts["recipes"]) {
+@@ -2623,11 +2626,67 @@ utils::options parse(int argc, const char* argv[]) {
+ 	return opts;
+ }
+ 
++int run_protocol(utils::options opts) {
++	utils::options::option opt;
++	for (std::string item : {"alpha", "lambda", "step", "stage", "block", "limit", "thread", "make", "search", "cache", "norm"}) {
++		if (opts(item)) opt[item] << opts[item].value();
++	}
++
++	method spec = method::parse(opt);
++	clip<feature> feats = feature::feats();
++	select best;
++	static const char* move_names[] = {"UP", "RIGHT", "DOWN", "LEFT"};
++
++	std::cout << "READY" << std::endl;
++	std::string line;
++	while (std::getline(std::cin, line)) {
++		if (line == "QUIT") break;
++
++		std::istringstream input(line);
++		std::string cmd, hex;
++		input >> cmd >> hex;
++		if (cmd != "SOLVE" || hex.empty()) {
++			std::cout << "ERR bad_request" << std::endl;
++			continue;
++		}
++
++		try {
++			u64 raw = std::stoull(hex, nullptr, 16);
++			board b(raw);
++			auto started = std::chrono::high_resolution_clock::now();
++			best(b, feats, spec);
++			auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
++				std::chrono::high_resolution_clock::now() - started).count() / 1000.0;
++
++			if (!best) {
++				std::cout << "OK NONE 0 0 " << elapsed << " 0" << std::endl;
++			} else {
++				std::cout << "OK " << move_names[best.opcode()] << " 0 "
++				          << std::setprecision(10) << best.esti() << " "
++				          << std::fixed << std::setprecision(3) << elapsed << " 0" << std::endl;
++			}
++		} catch (const std::exception& e) {
++			std::cout << "ERR " << e.what() << std::endl;
++		}
++	}
++	return 0;
++}
++
+ int main(int argc, const char* argv[]) {
+ 	utils::options opts = parse(argc, argv);
+ 	utils::handle_routine(opts["run"]);
+ 	utils::init_logging(opts["save"]);
+ 
++	if (opts("protocol")) {
++		utils::config_random(opts["seed"]);
++		utils::config_memory(opts["thread"]);
++		utils::config_weight(opts["alpha"]);
++		utils::init_cache(opts["cache"]);
++		utils::load_network(opts["load"]);
++		utils::make_network(opts["make"]);
++		return run_protocol(opts);
++	}
++
+ 	std::cout << "TDL2048+ by Hung Guei" << std::endl;
+ 	std::cout << "Develop" << format(" Rev.%s (GCC %s C++%d @ %s %s)",
+ 	             __COMMIT_ID__, __VERSION__, __cplusplus, __DATE_ISO__, __TIME__) << std::endl;

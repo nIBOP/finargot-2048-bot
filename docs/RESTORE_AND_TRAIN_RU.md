@@ -1,0 +1,141 @@
+# Восстановление окружения и обучение модели
+
+Этот репозиторий содержит код бота, Rust/Java/Python fallback-решатели, патч для
+TDL2048 и скрипты восстановления. В git намеренно нет `runs/`, `dist/`,
+`external/TDL2048/`, `.exe` и больших `.w` моделей: там приватный Chrome-профиль,
+логи и файлы на сотни мегабайт.
+
+## Быстрый рабочий путь
+
+1. Установить Python 3.10+ и Google Chrome.
+2. Установить зависимости:
+
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
+
+3. Восстановить TDL2048 и скачать модель:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
+   ```
+
+4. Запустить безопасный боевой режим:
+
+   ```powershell
+   .\START_BOT_SLOW.bat
+   ```
+
+## Что делает `setup_tdl_windows.ps1`
+
+Скрипт:
+
+1. Клонирует `https://github.com/moporgic/TDL2048` в `external/TDL2048`.
+2. Применяет `patches/tdl2048-protocol.patch`.
+3. Скачивает `8x6patt.w.xz` с `https://moporgic.info/2048/model/8x6patt.w.xz`.
+4. Распаковывает модель в `external/TDL2048/8x6patt.w`.
+5. Собирает `external/TDL2048/tdl2048.exe`.
+
+Патч нужен обязательно: без `--protocol` Python-бот не сможет общаться с TDL2048
+как с быстрым интерактивным решателем.
+
+## Требования для сборки TDL2048 на Windows
+
+Нужны Git, MSYS2, GCC, Make, curl/xz или Windows `tar`.
+
+Рекомендуемый путь:
+
+```powershell
+winget install Git.Git
+winget install MSYS2.MSYS2
+```
+
+Затем открыть `MSYS2 UCRT64` и выполнить:
+
+```bash
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc make git curl xz
+```
+
+После этого вернуться в PowerShell в корень репозитория и запустить:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
+```
+
+## Если модель уже есть
+
+Положить файлы вручную:
+
+```text
+external/TDL2048/tdl2048.exe
+external/TDL2048/8x6patt.w
+```
+
+После этого `START_BOT_SLOW.bat` должен работать без восстановления.
+
+## Обучение модели
+
+TDL2048 умеет обучать n-tuple сети. Это долгий CPU-heavy процесс: 8x6 модель
+большая, обучение с нуля может занимать часы или дни. Для экспериментов лучше
+начинать с `4x6patt`.
+
+Smoke-test на маленьком числе эпизодов:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 10
+```
+
+Обучить `4x6patt` на 1000k эпизодов:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 1000 -Threads 8
+```
+
+Дообучить существующую `8x6patt.w` и сохранить новую модель отдельно:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 `
+  -Network 8x6patt `
+  -EpisodesK 1000 `
+  -Threads 8 `
+  -InputModel external\TDL2048\8x6patt.w `
+  -OutputModel external\TDL2048\8x6patt-custom.w
+```
+
+Чтобы использовать свою модель в боте, либо переименовать ее в
+`external/TDL2048/8x6patt.w`, либо запускать напрямую:
+
+```powershell
+python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search 3p
+```
+
+## Проверки после восстановления
+
+```powershell
+python -m py_compile main.py bot_final.py simulate_local.py
+python -m unittest discover -s tests -v
+cargo build --release
+```
+
+Проверить, что TDL-файлы на месте:
+
+```powershell
+Test-Path external\TDL2048\tdl2048.exe
+Test-Path external\TDL2048\8x6patt.w
+```
+
+## Боевые настройки
+
+`START_BOT_SLOW.bat` включает:
+
+```text
+--delay 0.20 0.42
+--rest-every 300
+--rest-delay 4 10
+--force-loss-after-score 520000
+--force-loss-after-moves 18500
+```
+
+Последние два параметра нужны, чтобы не получить `BAD_MOVES`: сайт отклоняет
+слишком длинные партии по лимиту ходов.
+
