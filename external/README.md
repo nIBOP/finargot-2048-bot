@@ -20,3 +20,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
 
 That script clones upstream TDL2048, applies `patches/tdl2048-protocol.patch`,
 downloads the `8x6patt` model and builds `tdl2048.exe`.
+
+To verify the restored solver before a real run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
+```

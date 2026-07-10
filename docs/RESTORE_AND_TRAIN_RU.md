@@ -26,6 +26,12 @@
    .\START_BOT_SLOW.bat
    ```
 
+Перед боевым запуском на чужой машине полезно выполнить preflight:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
+```
+
 ## Что делает `setup_tdl_windows.ps1`
 
 Скрипт:
@@ -79,6 +85,9 @@ TDL2048 умеет обучать n-tuple сети. Это долгий CPU-heav
 большая, обучение с нуля может занимать часы или дни. Для экспериментов лучше
 начинать с `4x6patt`.
 
+Боевой запуск не требует обучения с нуля: `START_BOT_SLOW.bat` использует
+скачанную готовую модель `external/TDL2048/8x6patt.w`.
+
 Smoke-test на маленьком числе эпизодов:
 
 ```powershell
@@ -113,6 +122,7 @@ python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search 3
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1 -SkipModel -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
 python -m py_compile main.py bot_final.py
 ```
 
@@ -128,12 +138,11 @@ Test-Path external\TDL2048\8x6patt.w
 `START_BOT_SLOW.bat` включает:
 
 ```text
---delay 0.20 0.42
---rest-every 300
---rest-delay 4 10
+--rhythm-profile human
 --force-loss-after-score 520000
 --force-loss-after-moves 18500
 ```
 
+`--rhythm-profile human` включает нерегулярные паузы без фиксированного периода.
 Последние два параметра нужны, чтобы не получить `BAD_MOVES`: сайт отклоняет
 слишком длинные партии по лимиту ходов.

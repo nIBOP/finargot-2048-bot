@@ -18,6 +18,7 @@ echo Важно:
 echo   - Не закрывайте Chrome во время игры.
 echo   - Не нажимайте стрелки вручную.
 echo   - После конца игры дождитесь сохранения результата на сайте.
+echo   - Включен human rhythm: паузы нерегулярные, без строгого таймера каждые N ходов.
 echo   - Включен safe-finish: после ~520k или 18500 ходов бот сам закончит партию,
 echo     чтобы не получить BAD_MOVES за превышение лимита ходов.
 echo.
@@ -42,9 +43,24 @@ if not exist "external\TDL2048\8x6patt.w" (
   exit /b 1
 )
 
-set "PYTHON_CMD=python"
-where py >nul 2>nul
-if not errorlevel 1 set "PYTHON_CMD=py -3"
+set "PYTHON_CMD="
+where python >nul 2>nul
+if not errorlevel 1 (
+  python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+  if not errorlevel 1 set "PYTHON_CMD=python"
+)
+if not defined PYTHON_CMD (
+  where py >nul 2>nul
+  if not errorlevel 1 (
+    py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+    if not errorlevel 1 set "PYTHON_CMD=py -3"
+  )
+)
+if not defined PYTHON_CMD (
+  echo [ОШИБКА] Не найден Python 3.10 или новее.
+  pause
+  exit /b 1
+)
 
 echo [1/2] Проверяю зависимости Python...
 %PYTHON_CMD% -m pip install -r requirements.txt
@@ -65,9 +81,7 @@ echo.
   --tdl-network 8x6patt ^
   --tdl-search 3p ^
   --tile-encoding auto ^
-  --delay 0.20 0.42 ^
-  --rest-every 300 ^
-  --rest-delay 4 10 ^
+  --rhythm-profile human ^
   --after-move-timeout 1.2 ^
   --force-loss-after-score 520000 ^
   --force-loss-after-moves 18500 ^

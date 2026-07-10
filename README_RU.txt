@@ -25,7 +25,7 @@ FINARGOT 2048 BOT
   Play/Продолжить в Chrome.
 - "ход=..." значит, что бот сделал очередной ход.
 - "счет~" это примерная оценка счета по доске, она может немного отличаться от сайта.
-- "длинная пауза" это намеренное замедление, чтобы не получить TOO_FAST.
+- "rhythm=normal/micro/medium/long/think" показывает тип текущей нерегулярной паузы.
 - "Force-loss mode enabled" значит, что бот специально завершает партию до лимита ходов,
   чтобы избежать BAD_MOVES.
 
@@ -37,9 +37,8 @@ FINARGOT 2048 BOT
 
 Если сайт пишет TOO_FAST
 ------------------------
-Откройте START_BOT_SLOW.bat в блокноте и увеличьте задержки:
-  --delay 0.30 0.60
-  --rest-delay 6 14
+В текущем запуске включен --rhythm-profile human. Если сайт все равно пишет TOO_FAST,
+не ускоряйте бота и пришлите JSONL-лог из runs\battle_tdl_8x6_3p_slow.
 
 Логи и диагностика
 ------------------
@@ -60,6 +59,9 @@ FINARGOT 2048 BOT
 
 Коротко: чтобы восстановить внешний TDL-решатель, модель и сборку, запустите:
   powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
+
+Чтобы проверить, что чужая машина готова к запуску:
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
 
 Чтобы сделать тестовое обучение модели:
   powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 10

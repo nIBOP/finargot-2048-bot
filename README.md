@@ -7,11 +7,13 @@ Automation bot for the BattlePass 2048 mini-game. The current main entrypoint is
 
 - Python Selenium bot with friendly Russian console prompts.
 - Built-in Python fallback solver for smoke checks.
-- `START_BOT_SLOW.bat` for a safer slow launch that reduces `TOO_FAST` risk.
+- `START_BOT_SLOW.bat` for a safer launch with non-periodic human-paced rhythm.
 - `patches/tdl2048-protocol.patch`, required to make upstream TDL2048 work as
   an interactive solver for this bot.
 - `scripts/setup_tdl_windows.ps1`, which restores the external TDL2048 folder,
   downloads the model and builds `tdl2048.exe`.
+- `scripts/check_ready_windows.ps1`, which verifies Python, Chrome, TDL files and
+  the TDL protocol before a real run.
 - `scripts/train_tdl_windows.ps1`, a small wrapper for TDL2048 model training.
 
 ## What Is Not In Git
@@ -58,6 +60,12 @@ Keep those files local or share them as a separate archive/release asset.
 
 The console explains what to do in the opened Chrome window.
 
+To verify the machine before a real try:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
+```
+
 ## MSYS2/GCC Requirement
 
 `setup_tdl_windows.ps1` needs Git and a working `make`/`g++` toolchain. The
@@ -79,8 +87,9 @@ root.
 
 ## Training A Model
 
-Training is handled by TDL2048 and can take a long time. Start with a small
-4x6 smoke test:
+The battle launcher uses the downloaded `8x6patt.w` model and does not require
+training from scratch. Training is only for experiments and can take a long
+time, especially for 8x6 networks. Start with a small 4x6 smoke test:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 -Network 4x6patt -EpisodesK 10
@@ -109,5 +118,6 @@ More details in [docs/RESTORE_AND_TRAIN_RU.md](docs/RESTORE_AND_TRAIN_RU.md).
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1 -SkipModel -SkipBuild
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_ready_windows.ps1
 python -m py_compile main.py bot_final.py
 ```

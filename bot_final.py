@@ -72,6 +72,137 @@ class Decision:
     elapsed_ms: float
 
 
+@dataclass(frozen=True)
+class RhythmPause:
+    seconds: float
+    phase: str
+    reason: str
+
+
+class RhythmController:
+    def __init__(
+        self,
+        profile: Literal["off", "balanced", "human"],
+        legacy_delay: tuple[float, float],
+        legacy_rest_every: int,
+        legacy_rest_delay: tuple[float, float],
+    ) -> None:
+        self.profile = profile
+        self.legacy_delay = legacy_delay
+        self.legacy_rest_every = legacy_rest_every
+        self.legacy_rest_delay = legacy_rest_delay
+        self._startup_used = False
+        self._next_micro = self._schedule_micro(0)
+        self._next_medium = self._schedule_medium(0)
+        self._next_long = self._schedule_long(0)
+
+    def startup_pause(self) -> RhythmPause:
+        if self._startup_used:
+            return RhythmPause(0.0, "none", "startup_already_used")
+        self._startup_used = True
+        if self.profile == "human":
+            return RhythmPause(random.uniform(2.0, 8.0), "startup", "first_visible_board")
+        if self.profile == "balanced":
+            return RhythmPause(random.uniform(0.8, 2.5), "startup", "first_visible_board")
+        return RhythmPause(0.0, "off", "legacy_no_startup_pause")
+
+    def plan_after_move(
+        self,
+        board: Board,
+        decision: Decision,
+        move_number: int,
+        force_loss: bool,
+    ) -> RhythmPause:
+        if self.profile == "off":
+            return self._legacy_pause(move_number)
+
+        if force_loss:
+            seconds = random.uniform(0.7, 2.2)
+            return RhythmPause(seconds, "force_loss", "safe_finish_rhythm")
+
+        seconds = self._base_pause()
+        phase = "normal"
+        reasons = ["base"]
+
+        empty_count = len(empty_cells(board))
+        valid_count = len(decision.valid_moves)
+        if empty_count <= 4 or valid_count <= 2:
+            add = self._thinking_pause()
+            seconds += add
+            phase = "think"
+            reasons.append(f"tight_board_empty={empty_count}_valid={valid_count}")
+
+        scheduled = self._scheduled_pause(move_number)
+        if scheduled.seconds > 0:
+            seconds += scheduled.seconds
+            phase = scheduled.phase
+            reasons.append(scheduled.reason)
+
+        return RhythmPause(round(seconds, 3), phase, "+".join(reasons))
+
+    def _legacy_pause(self, move_number: int) -> RhythmPause:
+        delay_min, delay_max = self.legacy_delay
+        seconds = random.uniform(delay_min, delay_max)
+        phase = "legacy"
+        reason = "legacy_delay"
+        if self.legacy_rest_every > 0 and move_number % self.legacy_rest_every == 0:
+            rest_min, rest_max = self.legacy_rest_delay
+            seconds += random.uniform(rest_min, rest_max)
+            phase = "legacy_rest"
+            reason = f"legacy_rest_every_{self.legacy_rest_every}"
+        return RhythmPause(round(seconds, 3), phase, reason)
+
+    def _base_pause(self) -> float:
+        if self.profile == "human":
+            return self._clamp(random.lognormvariate(math.log(0.72), 0.42), 0.35, 1.6)
+        return self._clamp(random.lognormvariate(math.log(0.45), 0.35), 0.22, 1.05)
+
+    def _thinking_pause(self) -> float:
+        if self.profile == "human":
+            return random.uniform(0.6, 2.8)
+        return random.uniform(0.25, 1.3)
+
+    def _scheduled_pause(self, move_number: int) -> RhythmPause:
+        if move_number >= self._next_long:
+            self._next_long = self._schedule_long(move_number)
+            self._next_medium = self._schedule_medium(move_number)
+            self._next_micro = self._schedule_micro(move_number)
+            if self.profile == "human":
+                return RhythmPause(random.uniform(90.0, 240.0), "long", "long_break")
+            return RhythmPause(random.uniform(45.0, 120.0), "long", "long_break")
+        if move_number >= self._next_medium:
+            self._next_medium = self._schedule_medium(move_number)
+            self._next_micro = self._schedule_micro(move_number)
+            if self.profile == "human":
+                return RhythmPause(random.uniform(18.0, 70.0), "medium", "medium_break")
+            return RhythmPause(random.uniform(8.0, 24.0), "medium", "medium_break")
+        if move_number >= self._next_micro:
+            self._next_micro = self._schedule_micro(move_number)
+            if self.profile == "human":
+                return RhythmPause(random.uniform(2.0, 7.0), "micro", "micro_break")
+            return RhythmPause(random.uniform(1.2, 4.0), "micro", "micro_break")
+        return RhythmPause(0.0, "normal", "no_scheduled_break")
+
+    def _schedule_micro(self, move_number: int) -> int:
+        if self.profile == "human":
+            return move_number + random.randint(18, 65)
+        return move_number + random.randint(40, 100)
+
+    def _schedule_medium(self, move_number: int) -> int:
+        if self.profile == "human":
+            return move_number + random.randint(220, 650)
+        return move_number + random.randint(500, 1000)
+
+    def _schedule_long(self, move_number: int) -> int:
+        if self.profile == "human":
+            return move_number + random.randint(2500, 5000)
+        return move_number + random.randint(6000, 9000)
+
+    @staticmethod
+    def _clamp(value: float, minimum: float, maximum: float) -> float:
+        return max(minimum, min(maximum, value))
+
+
 class SearchTimeout(Exception):
     pass
 
@@ -1413,18 +1544,24 @@ def hold_browser_after_end(bot: Selenium2048Bot, seconds: int, reason: str) -> N
 
 def print_launch_guide(args: argparse.Namespace, log_path: Path | None, solver_label: str) -> None:
     delay_min, delay_max = args.delay
-    if args.rest_every > 0:
+    if args.rhythm_profile == "off" and args.rest_every > 0:
         rest_min, rest_max = args.rest_delay
         rest_text = f"каждые {args.rest_every} ходов пауза {rest_min:.1f}-{rest_max:.1f}s"
-    else:
+    elif args.rhythm_profile == "off":
         rest_text = "длинные паузы выключены"
+    else:
+        rest_text = "нерегулярные micro/medium/long паузы"
     log_text = str(log_path) if log_path else "выключены"
 
     print()
     print("=" * 72)
     print("[bot] Памятка запуска")
     print(f"[bot]   Браузер: {args.browser}. Решатель: {solver_label}.")
-    print(f"[bot]   Медленный режим против TOO_FAST: ход {delay_min:.2f}-{delay_max:.2f}s, {rest_text}.")
+    if args.rhythm_profile == "off":
+        rhythm_text = f"legacy/off: ход {delay_min:.2f}-{delay_max:.2f}s, {rest_text}"
+    else:
+        rhythm_text = f"{args.rhythm_profile}: {rest_text}"
+    print(f"[bot]   Ритм ходов: {rhythm_text}.")
     print(f"[bot]   Лог ходов: {log_text}")
     print("[bot]   Сейчас откроется Chrome. Дальше работайте только в этом окне.")
     print("[bot]   Если игра не началась сама - авторизуйтесь, откройте 2048 и нажмите Play/Продолжить.")
@@ -1445,8 +1582,8 @@ def run_bot(args: argparse.Namespace) -> int:
         fast_snake_weight=args.fast_snake_weight,
         million_mode=args.million_mode,
     )
-    delay_min, delay_max = args.delay
     log_path = Path(args.log_dir) / f"run-{int(time.time())}.jsonl" if args.log_dir else None
+    rhythm = RhythmController(args.rhythm_profile, tuple(args.delay), args.rest_every, tuple(args.rest_delay))
     base_dir = Path(__file__).resolve().parent
     tdl_exe = base_dir / "external" / "TDL2048" / "tdl2048.exe"
     tdl_network, tdl_model = resolve_tdl_model(base_dir, args.tdl_network)
@@ -1474,6 +1611,7 @@ def run_bot(args: argparse.Namespace) -> int:
     estimated_score = 0
     last_board: Board | None = None
     last_decision: Decision | None = None
+    last_move_sent_at: float | None = None
     force_loss_active = False
     try:
         bot.open_game()
@@ -1484,6 +1622,11 @@ def run_bot(args: argparse.Namespace) -> int:
                 print("[bot] Waiting for board...")
                 time.sleep(1.0)
                 continue
+
+            startup_pause = rhythm.startup_pause()
+            if startup_pause.seconds > 0:
+                print(f"[bot] стартовая пауза={startup_pause.seconds:.2f}s rhythm={startup_pause.phase}")
+                time.sleep(startup_pause.seconds)
 
             turn_config = million_mode_config(board, config)
             should_force_loss = (
@@ -1507,6 +1650,10 @@ def run_bot(args: argparse.Namespace) -> int:
                 _, predicted_gain, predicted_moved = simulate_move(board, decision.move)
                 if not predicted_moved:
                     predicted_gain = 0
+            planned_pause = rhythm.plan_after_move(board, decision, move_number + 1, force_loss_active)
+            actual_elapsed_since_prev_move = (
+                time.perf_counter() - last_move_sent_at if last_move_sent_at is not None else None
+            )
             if args.debug:
                 print("\n" + format_board(board))
                 print(
@@ -1524,6 +1671,11 @@ def run_bot(args: argparse.Namespace) -> int:
                     "decision": decision.__dict__,
                     "estimated_score": estimated_score,
                     "predicted_gain": predicted_gain,
+                    "rhythm_profile": args.rhythm_profile,
+                    "planned_sleep": planned_pause.seconds,
+                    "sleep_reason": planned_pause.reason,
+                    "rhythm_phase": planned_pause.phase,
+                    "actual_elapsed_since_prev_move": actual_elapsed_since_prev_move,
                     "solver_config": {
                         "depth": turn_config.depth,
                         "time_limit_ms": turn_config.time_limit_ms,
@@ -1554,6 +1706,7 @@ def run_bot(args: argparse.Namespace) -> int:
                 return 0
 
             bot.execute_move(decision.move)
+            last_move_sent_at = time.perf_counter()
             estimated_score += predicted_gain
             move_number += 1
 
@@ -1563,20 +1716,14 @@ def run_bot(args: argparse.Namespace) -> int:
             elif changed_board == board:
                 print("[bot] Ход отправлен, но поле не изменилось до таймаута. Продолжаю аккуратно.")
 
-            delay = random.uniform(delay_min, delay_max)
             print(
                 f"[bot] ход={move_number} сыграно={decision.move} "
                 f"счет~={estimated_score} прирост={predicted_gain} "
                 f"depth={decision.depth}/{turn_config.depth} budget={turn_config.time_limit_ms}ms "
-                f"пауза={delay:.2f}s value={decision.value:.2f}"
+                f"пауза={planned_pause.seconds:.2f}s rhythm={planned_pause.phase} value={decision.value:.2f}"
                 f"{' force_loss=1' if force_loss_active else ''}"
             )
-            time.sleep(delay)
-            if args.rest_every > 0 and move_number % args.rest_every == 0:
-                rest_min, rest_max = args.rest_delay
-                rest = random.uniform(rest_min, rest_max)
-                print(f"[bot] длинная пауза после хода {move_number}: {rest:.2f}s")
-                time.sleep(rest)
+            time.sleep(planned_pause.seconds)
 
         print(f"[bot] Достигнут лимит ходов: {args.max_moves}")
         print("[bot] Сейчас сохраню диагностику и оставлю браузер открытым для засчета результата.")
@@ -1635,6 +1782,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--corner", choices=("top-left", "top-right", "bottom-left", "bottom-right"), default="bottom-right")
     parser.add_argument("--strict-corner", action="store_true", help="Forbid moving away from the target row unless forced.")
     parser.add_argument("--relaxed-corner", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--rhythm-profile", choices=("off", "balanced", "human"), default="balanced", help="Move timing profile. Use off for legacy --delay/--rest-every behavior.")
     parser.add_argument("--delay", type=float, nargs=2, default=(0.20, 0.42), metavar=("MIN", "MAX"))
     parser.add_argument("--rest-every", type=int, default=300, help="Take a longer pause after every N moves; 0 disables it.")
     parser.add_argument("--rest-delay", type=float, nargs=2, default=(4.0, 10.0), metavar=("MIN", "MAX"))
