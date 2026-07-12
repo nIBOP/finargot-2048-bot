@@ -1,44 +1,42 @@
 @echo off
-chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
 echo ============================================================
-echo FINARGOT 2048 BOT - безопасный медленный запуск
+echo FINARGOT 2048 BOT - battle launch
 echo ============================================================
 echo.
-echo Что будет дальше:
-echo   1. Скрипт проверит Python-зависимости.
-echo   2. Откроется Chrome.
-echo   3. Если сайт попросит вход - войдите в BattlePass.
-echo   4. Откройте миниигру 2048 и нажмите Play/Продолжить.
-echo   5. Когда появится поле 4x4, бот начнет играть сам.
+echo What happens next:
+echo   1. This script checks Python dependencies.
+echo   2. Chrome opens.
+echo   3. If BattlePass asks for login, log in.
+echo   4. Open the 2048 mini-game and press Play/Continue.
+echo   5. When the 4x4 board is visible, the bot starts playing.
 echo.
-echo Важно:
-echo   - Не закрывайте Chrome во время игры.
-echo   - Не нажимайте стрелки вручную.
-echo   - После конца игры дождитесь сохранения результата на сайте.
-echo   - Включен human rhythm: паузы нерегулярные, без строгого таймера каждые N ходов.
-echo   - Включен safe-finish: после ~700k или 19500 ходов бот сам закончит партию,
-echo     чтобы не получить BAD_MOVES за превышение лимита ходов.
+echo Important:
+echo   - Do not close Chrome during the game.
+echo   - Do not press arrow keys manually.
+echo   - After game over, wait for the site to save the result.
+echo   - Human rhythm is enabled: pauses are irregular.
+echo   - Safe-finish is enabled after about 700k score or 19500 moves.
 echo.
 
 if not exist "bot_final.py" (
-  echo [ОШИБКА] Не найден bot_final.py. Запускайте этот файл из папки бота.
+  echo [ERROR] bot_final.py not found. Run this file from the bot folder.
   pause
   exit /b 1
 )
 
 if not exist "external\TDL2048\tdl2048.exe" (
-  echo [ОШИБКА] Не найден external\TDL2048\tdl2048.exe.
-  echo Соберите билд заново или проверьте папку external\TDL2048.
+  echo [ERROR] external\TDL2048\tdl2048.exe not found.
+  echo Run: powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
   pause
   exit /b 1
 )
 
 if not exist "external\TDL2048\8x6patt.w" (
-  echo [ОШИБКА] Не найдена модель external\TDL2048\8x6patt.w.
-  echo Без нее лучший TDL-режим не запустится.
+  echo [ERROR] external\TDL2048\8x6patt.w model not found.
+  echo Run: powershell -ExecutionPolicy Bypass -File .\scripts\setup_tdl_windows.ps1
   pause
   exit /b 1
 )
@@ -57,23 +55,23 @@ if not defined PYTHON_CMD (
   )
 )
 if not defined PYTHON_CMD (
-  echo [ОШИБКА] Не найден Python 3.10 или новее.
+  echo [ERROR] Python 3.10 or newer was not found.
   pause
   exit /b 1
 )
 
-echo [1/2] Проверяю зависимости Python...
+echo [1/2] Checking Python dependencies...
 %PYTHON_CMD% -m pip install -r requirements.txt
 if errorlevel 1 (
   echo.
-  echo [ОШИБКА] Не удалось установить зависимости.
-  echo Проверьте, что установлен Python 3 и есть доступ в интернет.
+  echo [ERROR] Could not install Python dependencies.
+  echo Check Python and internet access.
   pause
   exit /b 1
 )
 
 echo.
-echo [2/2] Запускаю бота. Дальше следуйте подсказкам в этой консоли.
+echo [2/2] Starting the bot. Follow the console and Chrome prompts.
 echo.
 %PYTHON_CMD% -u bot_final.py ^
   --browser chrome ^
@@ -90,5 +88,5 @@ echo.
   --error-hold 300
 
 echo.
-echo Бот завершился. Если выше была ошибка, пришлите файл лога из папки runs.
+echo Bot process ended. If there was an error, send the latest log from runs.
 pause
