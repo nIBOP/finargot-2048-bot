@@ -19,7 +19,7 @@ echo   - Не закрывайте Chrome во время игры.
 echo   - Не нажимайте стрелки вручную.
 echo   - После конца игры дождитесь сохранения результата на сайте.
 echo   - Включен human rhythm: паузы нерегулярные, без строгого таймера каждые N ходов.
-echo   - Включен safe-finish: после ~520k или 18500 ходов бот сам закончит партию,
+echo   - Включен safe-finish: после ~700k или 19500 ходов бот сам закончит партию,
 echo     чтобы не получить BAD_MOVES за превышение лимита ходов.
 echo.
 
@@ -83,8 +83,8 @@ echo.
   --tile-encoding auto ^
   --rhythm-profile human ^
   --after-move-timeout 1.2 ^
-  --force-loss-after-score 520000 ^
-  --force-loss-after-moves 18500 ^
+  --force-loss-after-score 700000 ^
+  --force-loss-after-moves 19500 ^
   --log-dir runs\battle_tdl_8x6_deep_human ^
   --post-game-hold 900 ^
   --error-hold 300

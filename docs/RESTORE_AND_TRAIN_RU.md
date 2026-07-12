@@ -140,8 +140,8 @@ Test-Path external\TDL2048\8x6patt.w
 ```text
 --rhythm-profile human
 --tdl-search "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
---force-loss-after-score 520000
---force-loss-after-moves 18500
+--force-loss-after-score 700000
+--force-loss-after-moves 19500
 ```
 
 `--rhythm-profile human` включает нерегулярные паузы без фиксированного периода.
