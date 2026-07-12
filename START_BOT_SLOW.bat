@@ -79,13 +79,13 @@ echo.
   --browser chrome ^
   --solver-backend tdl ^
   --tdl-network 8x6patt ^
-  --tdl-search 3p ^
+  --tdl-search "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p" ^
   --tile-encoding auto ^
   --rhythm-profile human ^
   --after-move-timeout 1.2 ^
   --force-loss-after-score 520000 ^
   --force-loss-after-moves 18500 ^
-  --log-dir runs\battle_tdl_8x6_3p_slow ^
+  --log-dir runs\battle_tdl_8x6_deep_human ^
   --post-game-hold 900 ^
   --error-hold 300
 

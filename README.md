@@ -60,6 +60,15 @@ Keep those files local or share them as a separate archive/release asset.
 
 The console explains what to do in the opened Chrome window.
 
+The battle launcher uses a deeper limited TDL search:
+
+```text
+5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p
+```
+
+This keeps 3-ply search on open boards, but searches deeper on dense endgame
+boards where low-score losses usually happen.
+
 To verify the machine before a real try:
 
 ```powershell

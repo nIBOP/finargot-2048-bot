@@ -22,6 +22,7 @@ Corner = Literal["top-left", "top-right", "bottom-left", "bottom-right"]
 SIZE = 4
 DIRECTIONS: tuple[Direction, ...] = ("UP", "DOWN", "LEFT", "RIGHT")
 DEFAULT_URL = "https://battlepass.ru/special/dark_carnival#dc-games"
+DEFAULT_TDL_SEARCH = "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
 POWER_VALUES = {1 << i for i in range(1, 18)}
 
 CORNER_POSITIONS: dict[Corner, tuple[int, int]] = {
@@ -1104,7 +1105,7 @@ class TDLSolverClient:
         executable: Path | str,
         model_path: Path | str,
         network: str = "4x6patt",
-        search: str = "3p",
+        search: str = DEFAULT_TDL_SEARCH,
     ) -> None:
         exe_path = Path(executable)
         weights_path = Path(model_path)
@@ -1773,7 +1774,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--legacy-solver", action="store_true", help="Use the old tuple-board solver instead of the fast bitboard solver.")
     parser.add_argument("--solver-backend", choices=("auto", "python", "tdl"), default="auto")
     parser.add_argument("--tdl-network", default="auto", help="TDL2048 network: auto, 4x6patt, 5x6patt, 6x6patt, 7x6patt, 8x6patt.")
-    parser.add_argument("--tdl-search", default="3p", help="TDL2048 expectimax search setting, for example 1p, 2p, 3p.")
+    parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting, for example 3p or '5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p'.")
     parser.add_argument("--fixed-depth", action="store_true", help="Use --depth exactly instead of adaptive distinct-tile depth.")
     parser.add_argument("--cprob-threshold", type=float, default=0.00005, help="Prune expectimax branches below this cumulative probability.")
     parser.add_argument("--million-mode", action="store_true", help="Use staged search budgets for a 32768/65536-tile run.")

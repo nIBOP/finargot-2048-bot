@@ -38,13 +38,13 @@ FINARGOT 2048 BOT
 Если сайт пишет TOO_FAST
 ------------------------
 В текущем запуске включен --rhythm-profile human. Если сайт все равно пишет TOO_FAST,
-не ускоряйте бота и пришлите JSONL-лог из runs\battle_tdl_8x6_3p_slow.
+не ускоряйте бота и пришлите JSONL-лог из runs\battle_tdl_8x6_deep_human.
 
 Логи и диагностика
 ------------------
-- Логи ходов лежат в runs\battle_tdl_8x6_3p_slow.
+- Логи ходов лежат в runs\battle_tdl_8x6_deep_human.
 - Снимки страницы, HTML и браузерные логи после ошибки или конца игры лежат в
-  runs\battle_tdl_8x6_3p_slow\diagnostics.
+  runs\battle_tdl_8x6_deep_human\diagnostics.
 
 Требования
 ----------

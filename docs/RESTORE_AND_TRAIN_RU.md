@@ -115,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 `
 `external/TDL2048/8x6patt.w`, либо запускать напрямую:
 
 ```powershell
-python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search 3p
+python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
 ```
 
 ## Проверки после восстановления
@@ -139,10 +139,13 @@ Test-Path external\TDL2048\8x6patt.w
 
 ```text
 --rhythm-profile human
+--tdl-search "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
 --force-loss-after-score 520000
 --force-loss-after-moves 18500
 ```
 
 `--rhythm-profile human` включает нерегулярные паузы без фиксированного периода.
+`--tdl-search ... limit=...` включает более глубокий поиск на плотных досках:
+5-ply при 0-3 пустых клетках, 4-ply при 4-7 пустых, 3-ply при 8+ пустых.
 Последние два параметра нужны, чтобы не получить `BAD_MOVES`: сайт отклоняет
 слишком длинные партии по лимиту ходов.

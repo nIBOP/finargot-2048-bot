@@ -1,6 +1,6 @@
 param(
     [string]$Network = "8x6patt",
-    [string]$Search = "1p"
+    [string]$Search = "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
 )
 
 $ErrorActionPreference = "Stop"
