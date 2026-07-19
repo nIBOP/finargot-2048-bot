@@ -82,7 +82,7 @@ echo.
   --solver-backend tdl ^
   --tdl-network 8x6patt ^
   --tdl-search "%TDL_SEARCH%" ^
-  --tdl-cache "256M" ^
+  --tdl-cache "512M" ^
   --tdl-cache-peek ^
   --tdl-downgrade-threshold 32768 ^
   --tile-encoding auto ^

@@ -23,7 +23,7 @@ SIZE = 4
 DIRECTIONS: tuple[Direction, ...] = ("UP", "DOWN", "LEFT", "RIGHT")
 DEFAULT_URL = "https://battlepass.ru/special/dark_carnival#dc-games"
 DEFAULT_TDL_SEARCH = "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p"
-DEFAULT_TDL_CACHE = "256M"
+DEFAULT_TDL_CACHE = "512M"
 POWER_VALUES = {1 << i for i in range(1, 18)}
 
 CORNER_POSITIONS: dict[Corner, tuple[int, int]] = {
@@ -1856,7 +1856,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--solver-backend", choices=("auto", "python", "tdl"), default="auto")
     parser.add_argument("--tdl-network", default="auto", help="TDL2048 network: auto, 4x6patt, 5x6patt, 6x6patt, 7x6patt, 8x6patt.")
     parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting. The default is an adaptive 7p/6p profile.")
-    parser.add_argument("--tdl-cache", default=DEFAULT_TDL_CACHE, help="TDL2048 transposition-table size, such as 256M. Pass an empty value to disable it.")
+    parser.add_argument("--tdl-cache", default=DEFAULT_TDL_CACHE, help="TDL2048 transposition-table size, such as 512M. Pass an empty value to disable it.")
     parser.add_argument("--tdl-cache-peek", action=argparse.BooleanOptionalAction, default=True, help="Allow TDL to reuse deeper cached search results.")
     parser.add_argument("--tdl-downgrade-threshold", type=int, default=32768, help="Apply TDL tile-downgrading at this tile value; 0 disables it.")
     parser.add_argument("--fixed-depth", action="store_true", help="Use --depth exactly instead of adaptive distinct-tile depth.")

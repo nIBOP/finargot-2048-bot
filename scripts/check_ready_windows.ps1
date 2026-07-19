@@ -1,7 +1,7 @@
 param(
     [string]$Network = "8x6patt",
     [string]$Search = "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p",
-    [string]$Cache = "256M",
+    [string]$Cache = "512M",
     [int]$DowngradeThreshold = 32768,
     [switch]$NoCachePeek
 )

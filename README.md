@@ -65,7 +65,7 @@ Keep those files local or share them as a separate archive/release asset.
 
 The console explains what to do in the opened Chrome window.
 
-The battle launcher uses a deep limited TDL search with a 256 MB transposition
+The battle launcher uses a deep limited TDL search with a 512 MB transposition
 table and deep-cache reuse:
 
 ```text
