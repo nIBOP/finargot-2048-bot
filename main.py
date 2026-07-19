@@ -22,7 +22,8 @@ Corner = Literal["top-left", "top-right", "bottom-left", "bottom-right"]
 SIZE = 4
 DIRECTIONS: tuple[Direction, ...] = ("UP", "DOWN", "LEFT", "RIGHT")
 DEFAULT_URL = "https://battlepass.ru/special/dark_carnival#dc-games"
-DEFAULT_TDL_SEARCH = "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
+DEFAULT_TDL_SEARCH = "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p"
+DEFAULT_TDL_CACHE = "256M"
 POWER_VALUES = {1 << i for i in range(1, 18)}
 
 CORNER_POSITIONS: dict[Corner, tuple[int, int]] = {
@@ -1106,6 +1107,8 @@ class TDLSolverClient:
         model_path: Path | str,
         network: str = "4x6patt",
         search: str = DEFAULT_TDL_SEARCH,
+        cache: str = DEFAULT_TDL_CACHE,
+        cache_peek: bool = True,
     ) -> None:
         exe_path = Path(executable)
         weights_path = Path(model_path)
@@ -1118,17 +1121,23 @@ class TDLSolverClient:
         msys_paths = [Path("C:/msys64/ucrt64/bin"), Path("C:/msys64/usr/bin")]
         env["PATH"] = os.pathsep.join(str(path) for path in msys_paths if path.exists()) + os.pathsep + env.get("PATH", "")
 
+        command = [
+            str(exe_path),
+            "--protocol",
+            "-n",
+            network,
+            "-i",
+            str(weights_path),
+            "-S",
+            search,
+        ]
+        if cache:
+            command.extend(("-c", cache))
+            if cache_peek:
+                command.append("peek")
+
         self.process = subprocess.Popen(
-            [
-                str(exe_path),
-                "--protocol",
-                "-n",
-                network,
-                "-i",
-                str(weights_path),
-                "-S",
-                search,
-            ],
+            command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1592,9 +1601,17 @@ def run_bot(args: argparse.Namespace) -> int:
     solver_label = "Python"
 
     if args.solver_backend in ("auto", "tdl") and tdl_exe.exists() and tdl_model.exists():
-        solver_label = f"TDL2048 {tdl_network}/{args.tdl_search}"
+        cache_label = f" cache={args.tdl_cache}{'+peek' if args.tdl_cache_peek else ''}" if args.tdl_cache else " cache=off"
+        solver_label = f"TDL2048 {tdl_network}/{args.tdl_search}{cache_label}"
         print(f"[bot] Запускаю решатель {solver_label}...")
-        tdl_solver_client = TDLSolverClient(tdl_exe, tdl_model, network=tdl_network, search=args.tdl_search)
+        tdl_solver_client = TDLSolverClient(
+            tdl_exe,
+            tdl_model,
+            network=tdl_network,
+            search=args.tdl_search,
+            cache=args.tdl_cache,
+            cache_peek=args.tdl_cache_peek,
+        )
         print("[bot] Решатель TDL2048 готов.")
     elif args.solver_backend == "tdl":
         raise RuntimeError("TDL2048 solver/model not found. Build external/TDL2048/tdl2048.exe and download 4x6patt.w.")
@@ -1678,6 +1695,9 @@ def run_bot(args: argparse.Namespace) -> int:
                     "rhythm_phase": planned_pause.phase,
                     "actual_elapsed_since_prev_move": actual_elapsed_since_prev_move,
                     "solver_config": {
+                        "tdl_search": args.tdl_search if tdl_solver_client else None,
+                        "tdl_cache": args.tdl_cache if tdl_solver_client else None,
+                        "tdl_cache_peek": args.tdl_cache_peek if tdl_solver_client else None,
                         "depth": turn_config.depth,
                         "time_limit_ms": turn_config.time_limit_ms,
                         "cprob_threshold": turn_config.cprob_threshold,
@@ -1774,7 +1794,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--legacy-solver", action="store_true", help="Use the old tuple-board solver instead of the fast bitboard solver.")
     parser.add_argument("--solver-backend", choices=("auto", "python", "tdl"), default="auto")
     parser.add_argument("--tdl-network", default="auto", help="TDL2048 network: auto, 4x6patt, 5x6patt, 6x6patt, 7x6patt, 8x6patt.")
-    parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting, for example 3p or '5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p'.")
+    parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting. The default is a dense-board 7p/6p/5p/4p/3p profile.")
+    parser.add_argument("--tdl-cache", default=DEFAULT_TDL_CACHE, help="TDL2048 transposition-table size, such as 256M. Pass an empty value to disable it.")
+    parser.add_argument("--tdl-cache-peek", action=argparse.BooleanOptionalAction, default=True, help="Allow TDL to reuse deeper cached search results.")
     parser.add_argument("--fixed-depth", action="store_true", help="Use --depth exactly instead of adaptive distinct-tile depth.")
     parser.add_argument("--cprob-threshold", type=float, default=0.00005, help="Prune expectimax branches below this cumulative probability.")
     parser.add_argument("--million-mode", action="store_true", help="Use staged search budgets for a 32768/65536-tile run.")

@@ -1,6 +1,8 @@
 param(
     [string]$Network = "8x6patt",
-    [string]$Search = "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p"
+    [string]$Search = "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p",
+    [string]$Cache = "256M",
+    [switch]$NoCachePeek
 )
 
 $ErrorActionPreference = "Stop"
@@ -105,7 +107,8 @@ $msysBins = @(
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $tdlExe
 $psi.WorkingDirectory = $tdlDir
-$psi.Arguments = "--protocol -n $Network -i `"$tdlModel`" -S $Search"
+$cacheArgs = if ($Cache) { " -c $Cache" + $(if ($NoCachePeek) { "" } else { " peek" }) } else { "" }
+$psi.Arguments = "--protocol -n $Network -i `"$tdlModel`" -S $Search$cacheArgs"
 $psi.UseShellExecute = $false
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true
