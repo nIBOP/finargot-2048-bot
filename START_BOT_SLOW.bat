@@ -77,7 +77,9 @@ echo.
   --browser chrome ^
   --solver-backend tdl ^
   --tdl-network 8x6patt ^
-  --tdl-search "5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p" ^
+  --tdl-search "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p" ^
+  --tdl-cache "256M" ^
+  --tdl-cache-peek ^
   --tile-encoding auto ^
   --rhythm-profile human ^
   --after-move-timeout 1.2 ^

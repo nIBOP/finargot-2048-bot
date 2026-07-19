@@ -60,14 +60,16 @@ Keep those files local or share them as a separate archive/release asset.
 
 The console explains what to do in the opened Chrome window.
 
-The battle launcher uses a deeper limited TDL search:
+The battle launcher uses a deep limited TDL search with a 256 MB transposition
+table and deep-cache reuse:
 
 ```text
-5p limit=5p,5p,5p,5p,4p,4p,4p,4p,3p
+7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p
 ```
 
-This keeps 3-ply search on open boards, but searches deeper on dense endgame
-boards where low-score losses usually happen.
+This keeps 3-ply search on open boards, while using 7-ply search on the
+dense endgame boards where low-score losses usually happen. The cache keeps
+that deeper search practical on the battle machine.
 
 To verify the machine before a real try:
 
