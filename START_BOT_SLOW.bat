@@ -2,8 +2,12 @@
 setlocal
 cd /d "%~dp0"
 
+if not defined TDL_SEARCH set "TDL_SEARCH=7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p"
+if not defined LAUNCH_LABEL set "LAUNCH_LABEL=balanced"
+
 echo ============================================================
 echo FINARGOT 2048 BOT - battle launch
+echo Search profile: %LAUNCH_LABEL%
 echo ============================================================
 echo.
 echo What happens next:
@@ -18,7 +22,7 @@ echo   - Do not close Chrome during the game.
 echo   - Do not press arrow keys manually.
 echo   - After game over, wait for the site to save the result.
 echo   - Human rhythm is enabled: pauses are irregular.
-echo   - Safe-finish is enabled after about 700k score or 19500 moves.
+echo   - There is no automatic score or move cutoff in this launcher.
 echo.
 
 if not exist "bot_final.py" (
@@ -77,14 +81,15 @@ echo.
   --browser chrome ^
   --solver-backend tdl ^
   --tdl-network 8x6patt ^
-  --tdl-search "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p" ^
+  --tdl-search "%TDL_SEARCH%" ^
   --tdl-cache "256M" ^
   --tdl-cache-peek ^
+  --tdl-downgrade-threshold 32768 ^
   --tile-encoding auto ^
   --rhythm-profile human ^
   --after-move-timeout 1.2 ^
-  --force-loss-after-score 700000 ^
-  --force-loss-after-moves 19500 ^
+  --max-stalled-moves 3 ^
+  --max-missing-board-reads 3 ^
   --log-dir runs\battle_tdl_8x6_deep_human ^
   --post-game-hold 900 ^
   --error-hold 300

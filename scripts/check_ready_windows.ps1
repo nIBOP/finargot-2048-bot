@@ -1,7 +1,8 @@
 param(
     [string]$Network = "8x6patt",
-    [string]$Search = "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p",
+    [string]$Search = "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p",
     [string]$Cache = "256M",
+    [int]$DowngradeThreshold = 32768,
     [switch]$NoCachePeek
 )
 
@@ -108,7 +109,7 @@ $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $tdlExe
 $psi.WorkingDirectory = $tdlDir
 $cacheArgs = if ($Cache) { " -c $Cache" + $(if ($NoCachePeek) { "" } else { " peek" }) } else { "" }
-$psi.Arguments = "--protocol -n $Network -i `"$tdlModel`" -S $Search$cacheArgs"
+$psi.Arguments = "--protocol -n $Network -i `"$tdlModel`" -S $Search -h $DowngradeThreshold$cacheArgs"
 $psi.UseShellExecute = $false
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true
@@ -136,6 +137,16 @@ try {
         throw "TDL SOLVE failed. Got: $response"
     }
     Pass "TDL protocol solved test board: $response"
+
+    # Rank 16 is a 65536 tile. This confirms the 80-bit protocol and
+    # tile-downgrading path rather than only the legacy 64-bit path.
+    $process.StandardInput.WriteLine("SOLVE 00010000000000000000")
+    $process.StandardInput.Flush()
+    $highTileResponse = Read-Line-WithTimeout $process.StandardOutput 20000 "TDL high-tile SOLVE"
+    if ($highTileResponse -notmatch "^OK (?:UP|RIGHT|DOWN|LEFT|NONE) 1 ") {
+        throw "TDL high-tile SOLVE failed. Got: $highTileResponse"
+    }
+    Pass "TDL protocol solved 65536-tile board with downgrading: $highTileResponse"
 
     $process.StandardInput.WriteLine("QUIT")
     $process.StandardInput.Flush()

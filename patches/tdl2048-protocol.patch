@@ -1,5 +1,5 @@
 diff --git a/2048.cpp b/2048.cpp
-index 7dcee58..24acddf 100644
+index 7dcee58..27590fd 100644
 --- a/2048.cpp
 +++ b/2048.cpp
 @@ -2545,6 +2545,9 @@ utils::options parse(int argc, const char* argv[]) {
@@ -21,7 +21,7 @@ index 7dcee58..24acddf 100644
  	if (!opts("seed")) opts["seed"] = format("%08" PRIx32, math::fmix32(microsec()));
  
  	for (std::string recipe : opts["recipes"]) {
-@@ -2623,11 +2626,67 @@ utils::options parse(int argc, const char* argv[]) {
+@@ -2623,11 +2626,101 @@ utils::options parse(int argc, const char* argv[]) {
  	return opts;
  }
  
@@ -34,7 +34,31 @@ index 7dcee58..24acddf 100644
 +	method spec = method::parse(opt);
 +	clip<feature> feats = feature::feats();
 +	select best;
++	const u32 downgrade_threshold = opts["shift"].value(0);
 +	static const char* move_names[] = {"UP", "RIGHT", "DOWN", "LEFT"};
++	auto parse_board = [](const std::string& hex) {
++		if (hex.empty() || hex.size() > 20) {
++			throw std::invalid_argument("board must be a 1-20 digit hexadecimal value");
++		}
++
++		const size_t raw_offset = hex.size() > 16 ? hex.size() - 16 : 0;
++		size_t parsed = 0;
++		u64 raw = std::stoull(hex.substr(raw_offset), &parsed, 16);
++		if (parsed != hex.size() - raw_offset) {
++			throw std::invalid_argument("invalid 64-bit board payload");
++		}
++
++		u16 ext = 0;
++		if (raw_offset) {
++			parsed = 0;
++			u32 high = std::stoul(hex.substr(0, raw_offset), &parsed, 16);
++			if (parsed != raw_offset || high > 0xffffu) {
++				throw std::invalid_argument("invalid 80-bit board extension");
++			}
++			ext = u16(high);
++		}
++		return board(raw, ext);
++	};
 +
 +	std::cout << "READY" << std::endl;
 +	std::string line;
@@ -50,17 +74,27 @@ index 7dcee58..24acddf 100644
 +		}
 +
 +		try {
-+			u64 raw = std::stoull(hex, nullptr, 16);
-+			board b(raw);
++			board b = parse_board(hex);
++			board search_board(b);
++			u32 downgrade_level = 0;
++			if (downgrade_threshold && b.scale80() >= downgrade_threshold) {
++				do {
++					search_board = b;
++					search_board.shift80(++downgrade_level);
++				} while (search_board.scale80() >= 65536u && downgrade_level < 16);
++				if (search_board.scale80() >= 65536u) {
++					throw std::runtime_error("tile-downgrading could not fit the board into 64 bits");
++				}
++			}
 +			auto started = std::chrono::high_resolution_clock::now();
-+			best(b, feats, spec);
++			best(search_board, feats, spec);
 +			auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
 +				std::chrono::high_resolution_clock::now() - started).count() / 1000.0;
 +
 +			if (!best) {
-+				std::cout << "OK NONE 0 0 " << elapsed << " 0" << std::endl;
++				std::cout << "OK NONE " << downgrade_level << " 0 " << elapsed << " 0" << std::endl;
 +			} else {
-+				std::cout << "OK " << move_names[best.opcode()] << " 0 "
++				std::cout << "OK " << move_names[best.opcode()] << " " << downgrade_level << " "
 +				          << std::setprecision(10) << best.esti() << " "
 +				          << std::fixed << std::setprecision(3) << elapsed << " 0" << std::endl;
 +			}

@@ -58,18 +58,30 @@ Keep those files local or share them as a separate archive/release asset.
    .\START_BOT_SLOW.bat
    ```
 
+   For a one-shot, accuracy-first run, use `START_BOT_MAX_SCORE.bat` instead.
+   It expands 7-ply search through positions with six empty cells. This can make
+   the game substantially longer, especially after reaching 8192, but it avoids
+   reducing the search budget in the most constrained positions.
+
 The console explains what to do in the opened Chrome window.
 
 The battle launcher uses a deep limited TDL search with a 256 MB transposition
 table and deep-cache reuse:
 
 ```text
-7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p
+7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p
 ```
 
-This keeps 3-ply search on open boards, while using 7-ply search on the
-dense endgame boards where low-score losses usually happen. The cache keeps
-that deeper search practical on the battle machine.
+This keeps at least 6-ply search throughout the game and uses 7-ply search
+on the densest endgame boards where low-score losses usually happen. The cache
+keeps that deeper search practical on the battle machine.
+
+The interactive protocol also preserves 80-bit board states through
+`131072` and enables TDL's built-in tile-downgrading from `32768`. This is
+needed to keep a `65536` tile from being misread as an empty cell.
+
+The battle launcher leaves forced-loss limits disabled so a rare high-scoring
+game can finish naturally instead of being cut off by a local move or score cap.
 
 To verify the machine before a real try:
 
