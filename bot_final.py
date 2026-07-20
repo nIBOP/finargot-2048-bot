@@ -22,8 +22,8 @@ Corner = Literal["top-left", "top-right", "bottom-left", "bottom-right"]
 SIZE = 4
 DIRECTIONS: tuple[Direction, ...] = ("UP", "DOWN", "LEFT", "RIGHT")
 DEFAULT_URL = "https://battlepass.ru/special/dark_carnival#dc-games"
-DEFAULT_TDL_SEARCH = "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p"
-DEFAULT_TDL_CACHE = "256M"
+DEFAULT_TDL_SEARCH = "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p"
+DEFAULT_TDL_CACHE = "512M"
 POWER_VALUES = {1 << i for i in range(1, 18)}
 
 CORNER_POSITIONS: dict[Corner, tuple[int, int]] = {
@@ -742,6 +742,23 @@ def board_to_bitboard(board: Board) -> int:
     return packed & MASK64
 
 
+def board_to_tdl_protocol_hex(board: Board) -> str:
+    """Encode ranks 0-31 for TDL's 80-bit board representation."""
+    raw = 0
+    extension = 0
+    for row in range(SIZE):
+        for col in range(SIZE):
+            value = board[row][col]
+            rank = 0 if value <= 0 else value.bit_length() - 1
+            if rank > 31:
+                raise RuntimeError(f"TDL protocol supports tiles through rank 31, got {value}")
+            index = row * SIZE + col
+            raw |= (rank & 0xF) << (4 * index)
+            if rank & 0x10:
+                extension |= 1 << index
+    return f"{extension:04x}{raw:016x}"
+
+
 def bitboard_to_board(board: int) -> Board:
     rows: list[list[int]] = []
     for row in range(SIZE):
@@ -1109,6 +1126,7 @@ class TDLSolverClient:
         search: str = DEFAULT_TDL_SEARCH,
         cache: str = DEFAULT_TDL_CACHE,
         cache_peek: bool = True,
+        downgrade_threshold: int = 32768,
     ) -> None:
         exe_path = Path(executable)
         weights_path = Path(model_path)
@@ -1135,6 +1153,8 @@ class TDLSolverClient:
             command.extend(("-c", cache))
             if cache_peek:
                 command.append("peek")
+        if downgrade_threshold > 0:
+            command.extend(("-h", str(downgrade_threshold)))
 
         self.process = subprocess.Popen(
             command,
@@ -1164,9 +1184,9 @@ class TDLSolverClient:
         if self.process.stdin is None or self.process.stdout is None:
             raise RuntimeError("TDL solver process is closed")
 
-        packed = board_to_bitboard(board)
+        packed = board_to_tdl_protocol_hex(board)
         started = time.perf_counter()
-        self.process.stdin.write(f"SOLVE {packed:016x}\n")
+        self.process.stdin.write(f"SOLVE {packed}\n")
         self.process.stdin.flush()
 
         line = self.process.stdout.readline().strip()
@@ -1611,6 +1631,7 @@ def run_bot(args: argparse.Namespace) -> int:
             search=args.tdl_search,
             cache=args.tdl_cache,
             cache_peek=args.tdl_cache_peek,
+            downgrade_threshold=args.tdl_downgrade_threshold,
         )
         print("[bot] Решатель TDL2048 готов.")
     elif args.solver_backend == "tdl":
@@ -1631,15 +1652,36 @@ def run_bot(args: argparse.Namespace) -> int:
     last_decision: Decision | None = None
     last_move_sent_at: float | None = None
     force_loss_active = False
+    stalled_move_count = 0
+    missing_board_count = 0
     try:
         bot.open_game()
 
         while args.max_moves <= 0 or move_number < args.max_moves:
             board = bot.read_board()
             if board is None:
+                missing_board_count += 1
                 print("[bot] Waiting for board...")
+                if (
+                    last_board is not None
+                    and args.max_missing_board_reads > 0
+                    and missing_board_count >= args.max_missing_board_reads
+                ):
+                    print("[bot] Игровое поле исчезло. Сохраняю экран результата и завершаю запуск.")
+                    capture_browser_snapshot(
+                        bot,
+                        args.log_dir,
+                        "board-disappeared",
+                        move_number,
+                        last_board,
+                        last_decision,
+                        estimated_score,
+                    )
+                    hold_browser_after_end(bot, args.post_game_hold, "board disappeared")
+                    return 0
                 time.sleep(1.0)
                 continue
+            missing_board_count = 0
 
             startup_pause = rhythm.startup_pause()
             if startup_pause.seconds > 0:
@@ -1698,6 +1740,7 @@ def run_bot(args: argparse.Namespace) -> int:
                         "tdl_search": args.tdl_search if tdl_solver_client else None,
                         "tdl_cache": args.tdl_cache if tdl_solver_client else None,
                         "tdl_cache_peek": args.tdl_cache_peek if tdl_solver_client else None,
+                        "tdl_downgrade_threshold": args.tdl_downgrade_threshold if tdl_solver_client else None,
                         "depth": turn_config.depth,
                         "time_limit_ms": turn_config.time_limit_ms,
                         "cprob_threshold": turn_config.cprob_threshold,
@@ -1733,9 +1776,27 @@ def run_bot(args: argparse.Namespace) -> int:
 
             changed_board = bot.wait_for_board_change(board, args.after_move_timeout)
             if changed_board is None:
+                stalled_move_count += 1
                 print("[bot] Ход отправлен, но поле временно не читается. Продолжаю аккуратно.")
             elif changed_board == board:
+                stalled_move_count += 1
                 print("[bot] Ход отправлен, но поле не изменилось до таймаута. Продолжаю аккуратно.")
+            else:
+                stalled_move_count = 0
+
+            if args.max_stalled_moves > 0 and stalled_move_count >= args.max_stalled_moves:
+                print("[bot] Сервер не принял несколько легальных ходов подряд. Сохраняю диагностику и останавливаюсь.")
+                capture_browser_snapshot(
+                    bot,
+                    args.log_dir,
+                    "stalled-board",
+                    move_number,
+                    changed_board or board,
+                    decision,
+                    estimated_score,
+                )
+                hold_browser_after_end(bot, args.error_hold, "stalled board")
+                return 1
 
             print(
                 f"[bot] ход={move_number} сыграно={decision.move} "
@@ -1794,9 +1855,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--legacy-solver", action="store_true", help="Use the old tuple-board solver instead of the fast bitboard solver.")
     parser.add_argument("--solver-backend", choices=("auto", "python", "tdl"), default="auto")
     parser.add_argument("--tdl-network", default="auto", help="TDL2048 network: auto, 4x6patt, 5x6patt, 6x6patt, 7x6patt, 8x6patt.")
-    parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting. The default is a dense-board 7p/6p/5p/4p/3p profile.")
-    parser.add_argument("--tdl-cache", default=DEFAULT_TDL_CACHE, help="TDL2048 transposition-table size, such as 256M. Pass an empty value to disable it.")
+    parser.add_argument("--tdl-search", default=DEFAULT_TDL_SEARCH, help="TDL2048 expectimax search setting. The default is an adaptive 7p/6p profile.")
+    parser.add_argument("--tdl-cache", default=DEFAULT_TDL_CACHE, help="TDL2048 transposition-table size, such as 512M. Pass an empty value to disable it.")
     parser.add_argument("--tdl-cache-peek", action=argparse.BooleanOptionalAction, default=True, help="Allow TDL to reuse deeper cached search results.")
+    parser.add_argument("--tdl-downgrade-threshold", type=int, default=32768, help="Apply TDL tile-downgrading at this tile value; 0 disables it.")
     parser.add_argument("--fixed-depth", action="store_true", help="Use --depth exactly instead of adaptive distinct-tile depth.")
     parser.add_argument("--cprob-threshold", type=float, default=0.00005, help="Prune expectimax branches below this cumulative probability.")
     parser.add_argument("--million-mode", action="store_true", help="Use staged search budgets for a 32768/65536-tile run.")
@@ -1810,6 +1872,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rest-every", type=int, default=300, help="Take a longer pause after every N moves; 0 disables it.")
     parser.add_argument("--rest-delay", type=float, nargs=2, default=(4.0, 10.0), metavar=("MIN", "MAX"))
     parser.add_argument("--after-move-timeout", type=float, default=1.2)
+    parser.add_argument("--max-stalled-moves", type=int, default=3, help="Capture diagnostics and stop after this many unchanged legal moves; 0 disables the watchdog.")
+    parser.add_argument("--max-missing-board-reads", type=int, default=3, help="Capture the result page and stop after this many missing-board reads; 0 disables the detector.")
     parser.add_argument("--max-moves", type=int, default=0, help="0 means unlimited.")
     parser.add_argument("--force-loss-after-moves", type=int, default=0, help="Switch to intentionally bad legal moves after N moves; 0 disables it.")
     parser.add_argument("--force-loss-after-score", type=int, default=0, help="Switch to intentionally bad legal moves after estimated score reaches N; 0 disables it.")
@@ -1828,6 +1892,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--delay must be two values: MIN MAX, where 0 <= MIN <= MAX")
     if args.rest_delay[0] < 0 or args.rest_delay[1] < args.rest_delay[0]:
         raise SystemExit("--rest-delay must be two values: MIN MAX, where 0 <= MIN <= MAX")
+    if args.tdl_downgrade_threshold < 0:
+        raise SystemExit("--tdl-downgrade-threshold must be non-negative")
     return run_bot(args)
 
 

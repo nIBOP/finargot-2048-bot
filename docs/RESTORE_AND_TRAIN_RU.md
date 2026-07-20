@@ -115,7 +115,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\train_tdl_windows.ps1 `
 `external/TDL2048/8x6patt.w`, либо запускать напрямую:
 
 ```powershell
-python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p" --tdl-cache 256M --tdl-cache-peek
+python -u bot_final.py --solver-backend tdl --tdl-network 8x6patt --tdl-search "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p" --tdl-cache 512M --tdl-cache-peek
 ```
 
 ## Проверки после восстановления
@@ -139,9 +139,8 @@ Test-Path external\TDL2048\8x6patt.w
 
 ```text
 --rhythm-profile human
---tdl-search "7p limit=7p,7p,6p,6p,6p,5p,5p,5p,4p,4p,4p,3p"
---force-loss-after-score 700000
---force-loss-after-moves 19500
+--tdl-search "7p limit=7p,7p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p,6p"
+--tdl-downgrade-threshold 32768
 ```
 
 `--rhythm-profile human` включает нерегулярные паузы без фиксированного периода.

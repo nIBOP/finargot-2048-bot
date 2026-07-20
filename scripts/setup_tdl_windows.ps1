@@ -31,11 +31,14 @@ if (-not (Test-Path -LiteralPath (Join-Path $tdlDir ".git"))) {
 
 Push-Location $tdlDir
 try {
-    if (-not (Select-String -Path "2048.cpp" -Pattern "--protocol" -Quiet)) {
+    if (-not (Select-String -Path "2048.cpp" -Pattern "downgrade_threshold" -Quiet)) {
+        if (Select-String -Path "2048.cpp" -Pattern "--protocol" -Quiet) {
+            throw "An older TDL protocol patch is present. Remove external\\TDL2048 and run this setup script again."
+        }
         Write-Host "Applying protocol patch..."
         git apply $patch
     } else {
-        Write-Host "Protocol patch already applied."
+        Write-Host "Current 80-bit protocol patch already applied."
     }
 
     if (-not $SkipModel -and -not (Test-Path -LiteralPath $model)) {
